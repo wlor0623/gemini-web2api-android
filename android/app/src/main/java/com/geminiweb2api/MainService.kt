@@ -32,10 +32,27 @@ class MainService : Service() {
             private set
         @Volatile var baseUrl: String = ""
             private set
+        @Volatile var port: Int = 0
+            private set
         @Volatile var lastError: String? = null
+
+        /** Snapshot of the Python-side log ring buffer, updated by the poller. */
+        @Volatile var logs: String = ""
+
+        fun clearLogs() {
+            Thread {
+                try {
+                    if (Python.isStarted()) {
+                        Python.getInstance().getModule("server_runner").callAttr("clear_logs")
+                    }
+                } catch (_: Throwable) {
+                }
+            }.start()
+        }
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var logPollerActive = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -47,6 +64,7 @@ class MainService : Service() {
             NotificationManager.IMPORTANCE_LOW
         )
         notificationManager().createNotificationChannel(channel)
+        startLogPoller()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -87,6 +105,7 @@ class MainService : Service() {
             if (status.optBoolean("running")) {
                 running = true
                 baseUrl = status.optString("base_url")
+                port = status.optInt("port", 0)
                 lastError = status.optString("error").takeIf { it.isNotEmpty() }
                 acquireWakeLock()
                 updateNotification(getString(R.string.notif_running, baseUrl))
@@ -127,7 +146,40 @@ class MainService : Service() {
 
     override fun onDestroy() {
         shutdownServer()
+        stopLogPoller()
         super.onDestroy()
+    }
+
+    /** Pull the Python log ring buffer into a static the UI can read cheaply. */
+    private fun startLogPoller() {
+        if (logPollerActive) {
+            return
+        }
+        logPollerActive = true
+        Thread {
+            while (logPollerActive) {
+                try {
+                    if (Python.isStarted()) {
+                        logs = Python.getInstance().getModule("server_runner")
+                            .callAttr("get_logs", 200).toString()
+                    }
+                } catch (_: Throwable) {
+                }
+                try {
+                    Thread.sleep(1000)
+                } catch (_: InterruptedException) {
+                    break
+                }
+            }
+        }.apply {
+            isDaemon = true
+            name = "log-poller"
+            start()
+        }
+    }
+
+    private fun stopLogPoller() {
+        logPollerActive = false
     }
 
     private fun buildNotification(text: String): Notification {

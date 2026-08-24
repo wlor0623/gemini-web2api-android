@@ -4,28 +4,106 @@ Kotlin (MainService) calls into this module:
     start_server(data_dir) -> JSON str
     stop_server()           -> JSON str
     server_status()         -> JSON str
+    get_logs(n)             -> str  (tail of the captured log)
+    clear_logs()            -> str
 
 The app's writable data directory is used as the working directory, so
 config.json / cookie.txt / the SQLite cache all live next to each other and
 can be edited from the UI or via adb.
 """
+import collections
 import json
 import os
+import socket
+import sys
 import threading
 import traceback
 
 from gemini_web2api.config import DEFAULT_CONFIG
 from gemini_web2api import __version__
 
-# Defaults tailored for running on a phone: loopback-only by default, and the
-# cookie file is created up front so the in-app editor has something to write.
+# LAN-accessible by default so other devices on the same Wi-Fi (e.g. a PC)
+# can call the API; the in-app settings UI can switch back to loopback-only.
 ANDROID_DEFAULT_CONFIG = dict(DEFAULT_CONFIG)
-ANDROID_DEFAULT_CONFIG.update({"host": "127.0.0.1", "cookie_file": "cookie.txt"})
+ANDROID_DEFAULT_CONFIG.update({"host": "0.0.0.0", "cookie_file": "cookie.txt"})
 
 _lock = threading.Lock()
 _httpd = None
 _thread = None
 _last_error = ""
+
+# ─── In-app log viewer ───────────────────────────────────────────────────────
+# All stdout/stderr writes (request logs, errors, startup prints) are kept in
+# a bounded ring buffer that the Kotlin UI polls once per second.
+_LOG_MAX_LINES = 500
+_log_lines = collections.deque(maxlen=_LOG_MAX_LINES)
+_log_lock = threading.Lock()
+_log_tee_installed = False
+
+
+class _TeeStream:
+    """Append writes to the log buffer while forwarding to the original stream."""
+
+    def __init__(self, original):
+        self._original = original
+
+    def write(self, text):
+        try:
+            _append_log(text)
+        except Exception:
+            pass
+        try:
+            self._original.write(text)
+        except Exception:
+            pass
+
+    def flush(self):
+        try:
+            self._original.flush()
+        except Exception:
+            pass
+
+    def isatty(self):
+        return False
+
+
+def _append_log(text):
+    with _log_lock:
+        for line in text.splitlines():
+            if line.strip():
+                _log_lines.append(line)
+
+
+def _install_log_tee():
+    global _log_tee_installed
+    if _log_tee_installed:
+        return
+    sys.stdout = _TeeStream(sys.stdout)
+    sys.stderr = _TeeStream(sys.stderr)
+    _log_tee_installed = True
+
+
+def get_logs(n: int = 200) -> str:
+    with _log_lock:
+        return "\n".join(list(_log_lines)[-n:])
+
+
+def clear_logs() -> str:
+    with _log_lock:
+        _log_lines.clear()
+    return get_logs()
+
+
+def _lan_ip() -> str:
+    """Best-effort local IP; the UDP connect sends no traffic."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
 
 
 def _prepare_data_dir(data_dir):
@@ -49,11 +127,14 @@ def _status():
     from gemini_web2api.config import CONFIG
 
     port = CONFIG.get("port")
+    host = CONFIG.get("host")
+    # 0.0.0.0 is not connectable, so show the address other devices should use.
+    shown_host = _lan_ip() if host in ("0.0.0.0", "::", "") else host
     return {
         "running": _httpd is not None,
-        "host": CONFIG.get("host"),
+        "host": host,
         "port": port,
-        "base_url": "http://127.0.0.1:{}/v1".format(port) if port else "",
+        "base_url": "http://{}:{}/v1".format(shown_host, port) if port else "",
         "error": _last_error,
         "version": __version__,
     }
@@ -70,6 +151,7 @@ def start_server(data_dir):
         if _httpd is not None:
             return _status_json()
         try:
+            _install_log_tee()
             config_path = _prepare_data_dir(data_dir)
             from gemini_web2api.config import CONFIG, load_config
             from gemini_web2api.server import GeminiHandler, ThreadedServer

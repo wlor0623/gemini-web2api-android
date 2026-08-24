@@ -10,10 +10,44 @@
     <string name="stop_server">停止服务</string>
     <string name="battery_opt">忽略电池优化（防杀后台）</string>
     <string name="battery_opt_failed">无法打开电池优化设置</string>
+    <string name="addr_hint">电脑与手机连同一 Wi-Fi 时，可直接访问上面的地址</string>
 
-    <string name="config_header">config.json</string>
-    <string name="config_hint">服务未启动时会先生成默认配置。host 改为 0.0.0.0 可让局域网设备访问；修改后保存将自动重启服务。</string>
-    <string name="save_config">保存配置</string>
+    <string name="test_header">一键测试</string>
+    <string name="test_msg_hint">测试消息（留空则发送默认问候语）</string>
+    <string name="test_btn">发送并等待回复</string>
+    <string name="test_running">正在发送请求，等待模型回复…</string>
+    <string name="test_no_service">请先启动服务</string>
+    <string name="test_default_msg">你好，请用一句话介绍你自己</string>
+    <string name="test_sent">发送：%1$s</string>
+    <string name="test_reply">回复：%1$s</string>
+    <string name="test_failed">失败：%1$s</string>
+    <string name="test_elapsed">（耗时 %1$.1f 秒）</string>
+    <string name="test_empty_reply">（模型返回了空内容）</string>
+
+    <string name="settings_header">服务设置</string>
+    <string name="settings_hint">修改后点保存；服务运行中保存会自动重启服务生效</string>
+    <string name="host_label">监听地址</string>
+    <string name="port_label">端口</string>
+    <string name="model_label">默认模型</string>
+    <string name="save_settings">保存设置</string>
+    <string name="invalid_port">端口必须是 1–65535 的数字</string>
+
+    <string-array name="host_choices">
+        <item>局域网（0.0.0.0，电脑可访问）</item>
+        <item>仅本机（127.0.0.1）</item>
+    </string-array>
+
+    <string-array name="model_ids">
+        <item>gemini-3.7-flash</item>
+        <item>gemini-3.6-flash</item>
+        <item>gemini-3.5-flash</item>
+        <item>gemini-3.5-flash-thinking</item>
+        <item>gemini-3.1-pro</item>
+        <item>gemini-3.1-pro-enhanced</item>
+        <item>gemini-auto</item>
+        <item>gemini-3.5-flash-thinking-lite</item>
+        <item>gemini-flash-lite</item>
+    </string-array>
 
     <string name="cookie_header">cookie.txt（Pro 模型）</string>
     <string name="cookie_hint">粘贴 SID=…; HSID=…; __Secure-1PSID=… 格式的 cookie，保存后立即生效，无需重启。</string>
@@ -24,6 +58,10 @@
     <string name="saved_cookie_live">已保存，即时生效</string>
     <string name="save_failed">保存失败：%1$s</string>
     <string name="error_unknown">未知错误</string>
+
+    <string name="log_header">运行日志</string>
+    <string name="log_empty">暂无日志</string>
+    <string name="clear_log">清空</string>
 
     <string name="notif_channel">API 服务</string>
     <string name="notif_title">Gemini Web2API</string>
