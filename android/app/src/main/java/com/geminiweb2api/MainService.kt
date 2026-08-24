@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.IBinder
 import android.os.PowerManager
 import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 import org.json.JSONObject
 
 /**
@@ -68,7 +69,7 @@ class MainService : Service() {
         Thread {
             val status: JSONObject = try {
                 if (!Python.isStarted()) {
-                    Python.start(applicationContext)
+                    Python.start(AndroidPlatform(applicationContext))
                 }
                 JSONObject(
                     Python.getInstance()
