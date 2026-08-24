@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+config.json
+cookie.txt
+cookie.json
+.env
+.idea
+.DS_Store
+gemini-auth.json
+*.sqlite3
+
+# Android (build outputs + synced copy of the Python package)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/python/gemini_web2api/
+dist/
